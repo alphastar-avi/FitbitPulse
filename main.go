@@ -144,9 +144,21 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 	// Determine snake_case filter name from kebab-case endpoint type
 	filterName := strings.ReplaceAll(dataType, "-", "_")
 
-	// Query for the last 7 days of data
-	startTime := time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
-	filter := fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
+	// Construct the appropriate filter based on data type rules
+	var filter string
+	if dataType == "sleep" {
+		// Sleep uses interval.end_time
+		startTime := time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
+		filter = fmt.Sprintf("sleep.interval.end_time >= \"%s\"", startTime)
+	} else if strings.HasPrefix(dataType, "daily-") {
+		// Daily summaries (like daily-resting-heart-rate) use .date (YYYY-MM-DD)
+		startDate := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+		filter = fmt.Sprintf("%s.date >= \"%s\"", filterName, startDate)
+	} else {
+		// Standard interval data (like steps) uses interval.start_time
+		startTime := time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
+		filter = fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
+	}
 
 	// Construct URL with proper encoding
 	u, err := url.Parse(fmt.Sprintf("%s/users/me/dataTypes/%s/dataPoints", apiBaseURL, dataType))
