@@ -8,6 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 var (
@@ -22,24 +23,25 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	clientID := os.Getenv("FITBIT_CLIENT_ID")
-	clientSecret := os.Getenv("FITBIT_CLIENT_SECRET")
+	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
 
 	if clientID == "" || clientSecret == "" {
-		log.Fatal("FITBIT_CLIENT_ID and FITBIT_CLIENT_SECRET must be set in .env")
+		log.Fatal("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in .env")
 	}
 
-	// Fitbit OAuth2 configuration
-	// Scopes reference: https://dev.fitbit.com/build/reference/web-api/developer-guide/authorization/
+	// Google Health API OAuth2 configuration
+	// Using generic Google endpoints and health-specific scopes
 	oauthConfig = &oauth2.Config{
 		RedirectURL:  "http://localhost:8080/callback",
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Scopes:       []string{"activity", "heartrate", "sleep", "profile"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://www.fitbit.com/oauth2/authorize",
-			TokenURL: "https://api.fitbit.com/oauth2/token",
+		Scopes: []string{
+			"https://www.googleapis.com/auth/health.activity.read",
+			"https://www.googleapis.com/auth/health.heart_rate.read",
+			"https://www.googleapis.com/auth/health.sleep.read",
 		},
+		Endpoint: google.Endpoint,
 	}
 
 	http.HandleFunc("/", handleHome)
@@ -47,16 +49,17 @@ func main() {
 	http.HandleFunc("/callback", handleCallback)
 
 	fmt.Println("Server listening on http://localhost:8080")
-	fmt.Println("Visit http://localhost:8080/login to authenticate with Fitbit")
+	fmt.Println("Visit http://localhost:8080/login to authenticate with Google Health (Fitbit)")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func handleHome(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome to FitbitPulse! Go to /login to authorize.")
+	fmt.Fprintf(w, "Welcome to FitbitPulse! Go to /login to authorize with Google Health.")
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
-	url := oauthConfig.AuthCodeURL(oauthState)
+	// Request offline access so we get a refresh token
+	url := oauthConfig.AuthCodeURL(oauthState, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
@@ -77,5 +80,5 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	// We have the token!
 	fmt.Fprintf(w, "Successfully authenticated!\n\nAccess Token: %s\n\nRefresh Token: %s", token.AccessToken, token.RefreshToken)
 	
-	// TODO: Save this token and start the background fetching routine
+	// TODO: Save this token and start the background fetching routine using health.googleapis.com
 }
