@@ -182,7 +182,6 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 		resp, apiErr = client.Do(req)
 
 	} else {
-		// Standard GET requests for sleep and resting heart rate
 		var filter string
 		if dataType == "sleep" {
 			filter = fmt.Sprintf("sleep.interval.end_time >= \"%s\"", startTime)
@@ -190,6 +189,7 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 			startDate := startT.Format("2006-01-02")
 			filter = fmt.Sprintf("%s.date >= \"%s\"", filterName, startDate)
 		} else {
+			// interval-based types: active-minutes, distance, active-zone-minutes etc.
 			filter = fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
 		}
 
