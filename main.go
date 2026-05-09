@@ -124,8 +124,16 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// handleRawData fetches raw data points from health.googleapis.com
 func handleRawData(w http.ResponseWriter, r *http.Request) {
+	// CORS setup
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS, POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	dataType := r.URL.Query().Get("type")
 	if dataType == "" {
 		http.Error(w, "Missing 'type' parameter (e.g. ?type=steps)", http.StatusBadRequest)
@@ -138,42 +146,67 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a client that automatically refreshes the token if expired
 	client := oauthConfig.Client(r.Context(), tok)
-
-	// Determine snake_case filter name from kebab-case endpoint type
 	filterName := strings.ReplaceAll(dataType, "-", "_")
 
-	// Construct the appropriate filter based on data type rules
-	var filter string
-	if dataType == "sleep" {
-		// Sleep uses interval.end_time
-		startTime := time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
-		filter = fmt.Sprintf("sleep.interval.end_time >= \"%s\"", startTime)
-	} else if strings.HasPrefix(dataType, "daily-") {
-		// Daily summaries (like daily-resting-heart-rate) use .date (YYYY-MM-DD)
-		startDate := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
-		filter = fmt.Sprintf("%s.date >= \"%s\"", filterName, startDate)
+	// 7 days ago
+	startT := time.Now().AddDate(0, 0, -7)
+	startTime := startT.Format(time.RFC3339)
+
+	var resp *http.Response
+	var apiErr error
+
+	if dataType == "steps" {
+		// Use dailyRollUp for steps
+		apiURL := fmt.Sprintf("%s/users/me/dataTypes/steps/dataPoints:dailyRollUp", apiBaseURL)
+		
+		bodyPayload := fmt.Sprintf(`{
+			"range": {
+				"start": {
+					"date": {"year": %d, "month": %d, "day": %d},
+					"time": {"hours": 0, "minutes": 0, "seconds": 0, "nanos": 0}
+				},
+				"end": {
+					"date": {"year": %d, "month": %d, "day": %d},
+					"time": {"hours": 0, "minutes": 0, "seconds": 0, "nanos": 0}
+				}
+			}
+		}`, startT.Year(), int(startT.Month()), startT.Day(), time.Now().AddDate(0, 0, 1).Year(), int(time.Now().AddDate(0, 0, 1).Month()), time.Now().AddDate(0, 0, 1).Day())
+
+		req, err := http.NewRequest("POST", apiURL, strings.NewReader(bodyPayload))
+		if err != nil {
+			http.Error(w, "Failed to create request", http.StatusInternalServerError)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, apiErr = client.Do(req)
+
 	} else {
-		// Standard interval data (like steps) uses interval.start_time
-		startTime := time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
-		filter = fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
+		// Standard GET requests for sleep and resting heart rate
+		var filter string
+		if dataType == "sleep" {
+			filter = fmt.Sprintf("sleep.interval.end_time >= \"%s\"", startTime)
+		} else if strings.HasPrefix(dataType, "daily-") {
+			startDate := startT.Format("2006-01-02")
+			filter = fmt.Sprintf("%s.date >= \"%s\"", filterName, startDate)
+		} else {
+			filter = fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
+		}
+
+		u, err := url.Parse(fmt.Sprintf("%s/users/me/dataTypes/%s/dataPoints", apiBaseURL, dataType))
+		if err != nil {
+			http.Error(w, "Failed to parse URL", http.StatusInternalServerError)
+			return
+		}
+		q := u.Query()
+		q.Set("filter", filter)
+		u.RawQuery = q.Encode()
+		
+		resp, apiErr = client.Get(u.String())
 	}
 
-	// Construct URL with proper encoding
-	u, err := url.Parse(fmt.Sprintf("%s/users/me/dataTypes/%s/dataPoints", apiBaseURL, dataType))
-	if err != nil {
-		http.Error(w, "Failed to parse URL", http.StatusInternalServerError)
-		return
-	}
-	q := u.Query()
-	q.Set("filter", filter)
-	u.RawQuery = q.Encode()
-	apiURL := u.String()
-
-	resp, err := client.Get(apiURL)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch from Google Health API: %s", err.Error()), http.StatusInternalServerError)
+	if apiErr != nil {
+		http.Error(w, fmt.Sprintf("Failed to fetch from Google Health API: %s", apiErr.Error()), http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
