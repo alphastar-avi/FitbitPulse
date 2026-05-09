@@ -20,3 +20,6 @@ go.work
 # Env files
 .env
 token.json
+
+# Vite cache
+frontend/.vite/
