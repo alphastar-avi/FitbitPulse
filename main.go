@@ -149,8 +149,8 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 	client := oauthConfig.Client(r.Context(), tok)
 	filterName := strings.ReplaceAll(dataType, "-", "_")
 
-	// 7 days ago
-	startT := time.Now().AddDate(0, 0, -7)
+	// 90 days ago for full history
+	startT := time.Now().AddDate(0, 0, -90)
 	startTime := startT.Format(time.RFC3339)
 
 	var resp *http.Response

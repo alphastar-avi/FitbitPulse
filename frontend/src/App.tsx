@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Activity, Heart, Moon, Loader2, Download, Wind, Thermometer, Brain, Droplets, Database } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, YAxis } from "recharts"
+import { Activity, Heart, Moon, Loader2, Download, Wind, Thermometer, Brain, Droplets, Database, RefreshCw, Flame, Navigation, Clock } from "lucide-react"
+import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, YAxis, AreaChart, Area } from "recharts"
 
 const API_BASE = "/api/raw"
 
@@ -11,30 +11,38 @@ const ttStyle = { contentStyle: { backgroundColor: 'hsl(var(--popover))', border
 const ax = { stroke: "hsl(var(--muted-foreground))", fontSize: 11, tickLine: false, axisLine: false }
 
 const ENDPOINTS = [
-  { type: 'steps', label: 'Daily Steps', description: 'Aggregated daily step count using dailyRollUp. Sum of all steps taken each civil day.', icon: '👣' },
-  { type: 'daily-resting-heart-rate', label: 'Resting Heart Rate', description: 'Lowest heart rate recorded during sleep. Lower values generally indicate better cardiovascular fitness.', icon: '❤️' },
-  { type: 'sleep', label: 'Sleep Sessions', description: 'Full sleep session data including stages (Deep, REM, Light, Awake) and total duration.', icon: '🌙' },
-  { type: 'daily-heart-rate-variability', label: 'Heart Rate Variability (HRV)', description: 'Variation in time between heartbeats. Higher HRV indicates better recovery and autonomic balance. Includes entropy and RMSSD.', icon: '🧠' },
-  { type: 'daily-respiratory-rate', label: 'Breathing Rate', description: 'Average breaths per minute measured during sleep. Normal range: 12–20 br/min.', icon: '💨' },
-  { type: 'daily-sleep-temperature-derivations', label: 'Wrist Skin Temperature', description: 'Nightly wrist temperature vs 30-day baseline. Deviations may indicate illness or menstrual cycle changes.', icon: '🌡️' },
-  { type: 'daily-oxygen-saturation', label: 'Blood Oxygen (SpO2)', description: 'Estimated blood oxygen saturation measured during sleep. Includes average, lower bound, and upper bound percentages.', icon: '🩸' },
-  { type: 'active-zone-minutes', label: 'Active Zone Minutes', description: 'Minutes spent in fat-burn, cardio, or peak heart rate zones. Granular 1-minute intervals.', icon: '⚡' },
-  { type: 'active-minutes', label: 'Active Minutes', description: 'Individual minutes of physical activity. Each data point represents one active minute interval.', icon: '🏃' },
-  { type: 'distance', label: 'Distance', description: 'Distance traveled in meters, measured in 1-minute intervals throughout the day.', icon: '📍' },
-  { type: 'sedentary-period', label: 'Sedentary Periods', description: 'Periods of inactivity. Consecutive sedentary minutes are grouped into intervals.', icon: '🪑' },
+  { type: 'steps', label: 'Daily Steps', description: 'Aggregated daily step count using dailyRollUp.', icon: '👣' },
+  { type: 'daily-resting-heart-rate', label: 'Resting Heart Rate', description: 'Lowest heart rate recorded during sleep.', icon: '❤️' },
+  { type: 'sleep', label: 'Sleep Sessions', description: 'Full sleep session data including stages and total duration.', icon: '🌙' },
+  { type: 'daily-heart-rate-variability', label: 'Heart Rate Variability', description: 'Variation in time between heartbeats. Includes entropy and RMSSD.', icon: '🧠' },
+  { type: 'daily-respiratory-rate', label: 'Breathing Rate', description: 'Average breaths per minute measured during sleep.', icon: '💨' },
+  { type: 'daily-sleep-temperature-derivations', label: 'Wrist Skin Temperature', description: 'Nightly wrist temperature vs 30-day baseline.', icon: '🌡️' },
+  { type: 'daily-oxygen-saturation', label: 'Blood Oxygen (SpO2)', description: 'Estimated blood oxygen saturation measured during sleep.', icon: '🩸' },
+  { type: 'active-zone-minutes', label: 'Active Zone Minutes', description: 'Minutes spent in fat-burn, cardio, or peak heart rate zones.', icon: '⚡' },
+  { type: 'active-minutes', label: 'Active Minutes', description: 'Individual minutes of physical activity.', icon: '🏃' },
+  { type: 'distance', label: 'Distance', description: 'Distance traveled in meters.', icon: '📍' },
+  { type: 'sedentary-period', label: 'Sedentary Periods', description: 'Periods of inactivity.', icon: '🪑' },
+  { type: 'daily-heart-rate-zones', label: 'Daily Heart Rate Zones', description: 'Daily summary of time spent in each heart rate zone.', icon: '💓' },
 ]
 
 function MiniChart({ data, dataKey, color, type = 'bar' }: any) {
+  // Only show the last 30 items for the UI
+  const displayData = data.slice(-30)
   return (
     <div className="h-[100px] mt-2">
       <ResponsiveContainer width="100%" height="100%">
         {type === 'line' ? (
-          <LineChart data={data} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
+          <LineChart data={displayData} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
             <XAxis dataKey="date" {...ax} tick={false} /><YAxis {...ax} domain={['dataMin - 2', 'dataMax + 2']} />
             <Tooltip {...ttStyle} /><Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} />
           </LineChart>
+        ) : type === 'area' ? (
+          <AreaChart data={displayData} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
+            <XAxis dataKey="date" {...ax} tick={false} /><YAxis {...ax} />
+            <Tooltip {...ttStyle} /><Area type="monotone" dataKey={dataKey} stroke={color} fillOpacity={0.3} fill={color} />
+          </AreaChart>
         ) : (
-          <BarChart data={data} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
+          <BarChart data={displayData} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
             <XAxis dataKey="date" {...ax} tick={false} /><YAxis {...ax} />
             <Tooltip {...ttStyle} /><Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} />
           </BarChart>
@@ -45,78 +53,158 @@ function MiniChart({ data, dataKey, color, type = 'bar' }: any) {
 }
 
 function DataTable({ rows, cols }: { rows: any[], cols: { key: string, label: string, cls?: string }[] }) {
+  // Only show the last 30 items for the UI, reversed so newest is on top
+  const displayRows = [...rows].slice(-30).reverse()
   return (
-    <div className="mt-3 overflow-x-auto">
+    <div className="mt-3 overflow-y-auto max-h-[200px]">
       <table className="w-full text-xs border-collapse">
-        <thead><tr className="border-b border-border">{cols.map(c => <th key={c.key} className="py-1 px-2 text-left text-muted-foreground font-medium">{c.label}</th>)}</tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={i} className="border-b border-border hover:bg-muted/30">{cols.map(c => <td key={c.key} className={`py-1 px-2 ${c.cls || 'text-foreground'}`}>{r[c.key]}</td>)}</tr>)}</tbody>
+        <thead className="sticky top-0 bg-card"><tr className="border-b border-border">{cols.map(c => <th key={c.key} className="py-1 px-2 text-left text-muted-foreground font-medium">{c.label}</th>)}</tr></thead>
+        <tbody>{displayRows.map((r, i) => <tr key={i} className="border-b border-border hover:bg-muted/30">{cols.map(c => <td key={c.key} className={`py-1 px-2 ${c.cls || 'text-foreground'}`}>{r[c.key]}</td>)}</tr>)}</tbody>
       </table>
     </div>
   )
 }
 
 export default function App() {
-  const [data, setData] = useState<any>({ steps: [], hr: [], sleep: [], hrv: [], resp: [], wristTemp: [], spo2: [] })
+  const [data, setData] = useState<any>({ steps: [], hr: [], sleep: [], hrv: [], resp: [], wristTemp: [], spo2: [], distance: [], activeMins: [], activeZones: [], sedentary: [], hrZones: [] })
   const [rawCache, setRawCache] = useState<Record<string, any>>({})
   const [loadingRaw, setLoadingRaw] = useState<Record<string, boolean>>({})
-  const [summary, setSummary] = useState({ avgSteps: 0, avgHr: 0, avgSleep: 0, avgHrv: 0, avgResp: 0, avgTemp: 0, avgSpo2: 0 })
+  const [summary, setSummary] = useState<any>({})
   const [loading, setLoading] = useState(true)
+  
+  // Refresh & Rate limit state
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [refreshCount, setRefreshCount] = useState(0)
+  const [cooldownTime, setCooldownTime] = useState(0)
+  const refreshHistory = useRef<number[]>([])
 
   useEffect(() => {
-    async function fetchAll() {
-      try {
-        const types = ['steps','daily-resting-heart-rate','sleep','daily-heart-rate-variability','daily-respiratory-rate','daily-sleep-temperature-derivations','daily-oxygen-saturation']
-        const results = await Promise.all(types.map(t => fetch(`${API_BASE}?type=${t}`).then(r => r.json()).catch(() => ({}))))
-        const [stepsJ, hrJ, sleepJ, hrvJ, respJ, tempJ, spo2J] = results
-
-        const steps = (stepsJ.rollupDataPoints || []).filter((d: any) => d.steps?.countSum).map((d: any) => {
-          const dt = new Date(d.civilStartTime.date.year, d.civilStartTime.date.month - 1, d.civilStartTime.date.day)
-          return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), steps: parseInt(d.steps.countSum) }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        const hr = (hrJ.dataPoints || []).map((d: any) => {
-          const h = d.dailyRestingHeartRate; const dt = new Date(h.date.year, h.date.month - 1, h.date.day)
-          return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), bpm: parseInt(h.beatsPerMinute) }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        const sleep = (sleepJ.dataPoints || []).filter((d: any) => d.sleep?.summary).map((d: any) => {
-          const start = new Date(d.sleep.interval.startTime)
-          const stages: any[] = d.sleep.summary.stagesSummary || []
-          const mins = (type: string) => parseFloat(((parseInt(stages.find((s: any) => s.type === type)?.minutes ?? '0') || 0) / 60).toFixed(1))
-          return { rawDate: start, date: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), hours: parseFloat(((parseInt(d.sleep.summary.minutesAsleep ?? '0') || 0) / 60).toFixed(1)), deep: mins('DEEP'), rem: mins('REM'), light: mins('LIGHT'), awake: mins('AWAKE') }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        const hrv = (hrvJ.dataPoints || []).map((d: any) => {
-          const h = d.dailyHeartRateVariability; const dt = new Date(h.date.year, h.date.month - 1, h.date.day)
-          return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), hrv: h.averageHeartRateVariabilityMilliseconds ?? 0, entropy: parseFloat(Number(h.entropy || 0).toFixed(2)), rmssd: parseFloat(Number(h.deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds || 0).toFixed(1)) }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        const resp = (respJ.dataPoints || []).map((d: any) => {
-          const r = d.dailyRespiratoryRate; const dt = new Date(r.date.year, r.date.month - 1, r.date.day)
-          return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), bpm: r.breathsPerMinute }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        const wristTemp = (tempJ.dataPoints || []).map((d: any) => {
-          const t = d.dailySleepTemperatureDerivations; const dt = new Date(t.date.year, t.date.month - 1, t.date.day)
-          const nightly = parseFloat(Number(t.nightlyTemperatureCelsius || 0).toFixed(2))
-          const baseline = parseFloat(Number(t.baselineTemperatureCelsius || 0).toFixed(2))
-          return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), nightly, baseline, deviation: parseFloat((nightly - baseline).toFixed(2)) }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        const spo2 = (spo2J.dataPoints || []).map((d: any) => {
-          const s = d.dailyOxygenSaturation; const dt = new Date(s.date.year, s.date.month - 1, s.date.day)
-          return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), avg: parseFloat(Number(s.averagePercentage || 0).toFixed(1)), low: Number(s.lowerBoundPercentage || 0), high: Number(s.upperBoundPercentage || 0) }
-        }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-        setData({ steps, hr, sleep, hrv, resp, wristTemp, spo2 })
-
-        const avg = (arr: any[], key: string) => arr.length ? Math.round(arr.reduce((s, d) => s + d[key], 0) / arr.length * 10) / 10 : 0
-        setSummary({ avgSteps: avg(steps, 'steps'), avgHr: avg(hr, 'bpm'), avgSleep: avg(sleep, 'hours'), avgHrv: avg(hrv, 'hrv'), avgResp: avg(resp, 'bpm'), avgTemp: avg(wristTemp, 'nightly'), avgSpo2: avg(spo2, 'avg') })
-      } catch (e) { console.error('Fetch error:', e) }
-      finally { setLoading(false) }
+    if (cooldownTime > 0) {
+      const timer = setTimeout(() => setCooldownTime(c => c - 1), 1000)
+      return () => clearTimeout(timer)
     }
-    fetchAll()
-  }, [])
+  }, [cooldownTime])
+
+  const fetchAll = async () => {
+    // Rate limit check: max 6 requests per 60 seconds
+    const now = Date.now()
+    refreshHistory.current = refreshHistory.current.filter(time => now - time < 60000)
+    if (refreshHistory.current.length >= 6) {
+      const oldest = refreshHistory.current[0]
+      const waitTime = Math.ceil((60000 - (now - oldest)) / 1000)
+      setCooldownTime(waitTime)
+      return
+    }
+    refreshHistory.current.push(now)
+    setRefreshCount(c => c + 1)
+    
+    setLoading(true)
+    try {
+      const types = ['steps','daily-resting-heart-rate','sleep','daily-heart-rate-variability','daily-respiratory-rate','daily-sleep-temperature-derivations','daily-oxygen-saturation', 'distance', 'active-minutes', 'active-zone-minutes', 'sedentary-period', 'daily-heart-rate-zones']
+      const results = await Promise.all(types.map(t => fetch(`${API_BASE}?type=${t}`).then(r => r.json()).catch(() => ({}))))
+      const [stepsJ, hrJ, sleepJ, hrvJ, respJ, tempJ, spo2J, distJ, actMinsJ, actZoneJ, sedJ, hrZonJ] = results
+
+      const formatDt = (y: number, m: number, d: number) => {
+        const dt = new Date(y, m - 1, d)
+        return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
+      }
+      const formatIso = (isoStr: string) => {
+        const dt = new Date(isoStr)
+        return { rawDate: dt, date: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
+      }
+
+      const steps = (stepsJ.rollupDataPoints || []).filter((d: any) => d.steps?.countSum).map((d: any) => ({ ...formatDt(d.civilStartTime.date.year, d.civilStartTime.date.month, d.civilStartTime.date.day), steps: parseInt(d.steps.countSum) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      const hr = (hrJ.dataPoints || []).map((d: any) => ({ ...formatDt(d.dailyRestingHeartRate.date.year, d.dailyRestingHeartRate.date.month, d.dailyRestingHeartRate.date.day), bpm: parseInt(d.dailyRestingHeartRate.beatsPerMinute) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      const sleep = (sleepJ.dataPoints || []).filter((d: any) => d.sleep?.summary).map((d: any) => {
+        const stages: any[] = d.sleep.summary.stagesSummary || []
+        const mins = (type: string) => parseFloat(((parseInt(stages.find((s: any) => s.type === type)?.minutes ?? '0') || 0) / 60).toFixed(1))
+        return { ...formatIso(d.sleep.interval.startTime), hours: parseFloat(((parseInt(d.sleep.summary.minutesAsleep ?? '0') || 0) / 60).toFixed(1)), deep: mins('DEEP'), rem: mins('REM'), light: mins('LIGHT'), awake: mins('AWAKE') }
+      }).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      const hrv = (hrvJ.dataPoints || []).map((d: any) => ({ ...formatDt(d.dailyHeartRateVariability.date.year, d.dailyHeartRateVariability.date.month, d.dailyHeartRateVariability.date.day), hrv: d.dailyHeartRateVariability.averageHeartRateVariabilityMilliseconds ?? 0, entropy: parseFloat(Number(d.dailyHeartRateVariability.entropy || 0).toFixed(2)), rmssd: parseFloat(Number(d.dailyHeartRateVariability.deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds || 0).toFixed(1)) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      const resp = (respJ.dataPoints || []).map((d: any) => ({ ...formatDt(d.dailyRespiratoryRate.date.year, d.dailyRespiratoryRate.date.month, d.dailyRespiratoryRate.date.day), bpm: d.dailyRespiratoryRate.breathsPerMinute })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      const wristTemp = (tempJ.dataPoints || []).map((d: any) => {
+        const t = d.dailySleepTemperatureDerivations
+        const nightly = parseFloat(Number(t.nightlyTemperatureCelsius || 0).toFixed(2))
+        const baseline = parseFloat(Number(t.baselineTemperatureCelsius || 0).toFixed(2))
+        return { ...formatDt(t.date.year, t.date.month, t.date.day), nightly, baseline, deviation: parseFloat((nightly - baseline).toFixed(2)) }
+      }).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      const spo2 = (spo2J.dataPoints || []).map((d: any) => ({ ...formatDt(d.dailyOxygenSaturation.date.year, d.dailyOxygenSaturation.date.month, d.dailyOxygenSaturation.date.day), avg: parseFloat(Number(d.dailyOxygenSaturation.averagePercentage || 0).toFixed(1)), low: Number(d.dailyOxygenSaturation.lowerBoundPercentage || 0), high: Number(d.dailyOxygenSaturation.upperBoundPercentage || 0) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      // Activity: distance (meters)
+      const distMap = new Map();
+      (distJ.dataPoints || []).forEach((d: any) => {
+        if (!d.distance?.interval?.civilStartTime) return
+        const { date, rawDate } = formatDt(d.distance.interval.civilStartTime.date.year, d.distance.interval.civilStartTime.date.month, d.distance.interval.civilStartTime.date.day)
+        const meters = parseFloat(d.distance.millimeters || '0') / 1000
+        distMap.set(date, { date, rawDate, meters: (distMap.get(date)?.meters || 0) + meters })
+      })
+      const distance = Array.from(distMap.values()).map(d => ({ ...d, meters: Math.round(d.meters) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      // Activity: active minutes
+      const actMap = new Map();
+      (actMinsJ.dataPoints || []).forEach((d: any) => {
+        if (!d.activeMinutes?.interval?.civilStartTime) return
+        const { date, rawDate } = formatDt(d.activeMinutes.interval.civilStartTime.date.year, d.activeMinutes.interval.civilStartTime.date.month, d.activeMinutes.interval.civilStartTime.date.day)
+        let mins = 0
+        ;(d.activeMinutes.activeMinutesByActivityLevel || []).forEach((a: any) => mins += parseInt(a.activeMinutes || '0'))
+        actMap.set(date, { date, rawDate, minutes: (actMap.get(date)?.minutes || 0) + mins })
+      })
+      const activeMins = Array.from(actMap.values()).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      // Activity: active zone minutes
+      const actZoneMap = new Map();
+      (actZoneJ.dataPoints || []).forEach((d: any) => {
+        if (!d.activeZoneMinutes?.interval?.civilStartTime) return
+        const { date, rawDate } = formatDt(d.activeZoneMinutes.interval.civilStartTime.date.year, d.activeZoneMinutes.interval.civilStartTime.date.month, d.activeZoneMinutes.interval.civilStartTime.date.day)
+        const mins = parseInt(d.activeZoneMinutes.activeZoneMinutes || '0')
+        const zone = d.activeZoneMinutes.heartRateZone
+        const ex = actZoneMap.get(date) || { date, rawDate, fatBurn: 0, cardio: 0, peak: 0 }
+        if (zone === 'FAT_BURN') ex.fatBurn += mins
+        else if (zone === 'CARDIO') ex.cardio += mins
+        else if (zone === 'PEAK') ex.peak += mins
+        actZoneMap.set(date, ex)
+      })
+      const activeZones = Array.from(actZoneMap.values()).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      // Sedentary periods
+      const sedMap = new Map();
+      (sedJ.dataPoints || []).forEach((d: any) => {
+        const start = new Date(d.sedentaryPeriod.interval.startTime)
+        const end = new Date(d.sedentaryPeriod.interval.endTime)
+        const mins = (end.getTime() - start.getTime()) / 60000
+        const { date, rawDate } = formatIso(d.sedentaryPeriod.interval.startTime)
+        sedMap.set(date, { date, rawDate, minutes: (sedMap.get(date)?.minutes || 0) + mins })
+      })
+      const sedentary = Array.from(sedMap.values()).map(d => ({ ...d, hours: parseFloat((d.minutes / 60).toFixed(1)) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      // Daily Heart Rate Zones
+      const hrZones = (hrZonJ.dataPoints || []).map((d: any) => {
+        const { date, rawDate } = formatDt(d.dailyHeartRateZones.date.year, d.dailyHeartRateZones.date.month, d.dailyHeartRateZones.date.day)
+        const z = d.dailyHeartRateZones.heartRateZones || []
+        const mins = (type: string) => parseInt(z.find((x: any) => x.heartRateZoneType === type)?.minutes || '0')
+        return { date, rawDate, outOfRange: mins('OUT_OF_RANGE'), fatBurn: mins('FAT_BURN'), cardio: mins('CARDIO'), peak: mins('PEAK') }
+      }).sort((a: any, b: any) => a.rawDate - b.rawDate)
+
+      setData({ steps, hr, sleep, hrv, resp, wristTemp, spo2, distance, activeMins, activeZones, sedentary, hrZones })
+
+      const avg = (arr: any[], key: string) => arr.length ? Math.round(arr.reduce((s, d) => s + d[key], 0) / arr.length * 10) / 10 : 0
+      setSummary({ 
+        avgSteps: avg(steps, 'steps'), avgHr: avg(hr, 'bpm'), avgSleep: avg(sleep, 'hours'), avgHrv: avg(hrv, 'hrv'), 
+        avgResp: avg(resp, 'bpm'), avgTemp: avg(wristTemp, 'nightly'), avgSpo2: avg(spo2, 'avg'), avgDist: avg(distance, 'meters'),
+        avgAct: avg(activeMins, 'minutes'), avgSed: avg(sedentary, 'hours')
+      })
+      setLastUpdated(new Date())
+    } catch (e) { console.error('Fetch error:', e) }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { fetchAll() }, [])
 
   const fetchRaw = async (type: string) => {
     if (rawCache[type]) return
@@ -131,10 +219,8 @@ export default function App() {
 
   const downloadJSON = (type: string) => {
     const blob = new Blob([JSON.stringify(rawCache[type], null, 2)], { type: 'application/json' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `fitbit_charge6_${type}_${new Date().toISOString().split('T')[0]}.json`
-    link.click()
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob)
+    link.download = `fitbit_charge6_${type}_${new Date().toISOString().split('T')[0]}.json`; link.click()
   }
 
   const downloadAllJSON = async () => {
@@ -157,6 +243,12 @@ export default function App() {
     data.resp.forEach((d: any) => merge(d.date, { BreathingRate_BPM: d.bpm }))
     data.wristTemp.forEach((d: any) => merge(d.date, { WristTemp_Nightly_C: d.nightly, WristTemp_Baseline_C: d.baseline, WristTemp_Deviation_C: d.deviation }))
     data.spo2.forEach((d: any) => merge(d.date, { SpO2_Avg_Pct: d.avg, SpO2_Low_Pct: d.low, SpO2_High_Pct: d.high }))
+    data.distance.forEach((d: any) => merge(d.date, { Distance_Meters: d.meters }))
+    data.activeMins.forEach((d: any) => merge(d.date, { Active_Minutes: d.minutes }))
+    data.activeZones.forEach((d: any) => merge(d.date, { Zone_FatBurn_Mins: d.fatBurn, Zone_Cardio_Mins: d.cardio, Zone_Peak_Mins: d.peak }))
+    data.sedentary.forEach((d: any) => merge(d.date, { Sedentary_Hours: d.hours }))
+    data.hrZones.forEach((d: any) => merge(d.date, { HR_Out_Mins: d.outOfRange, HR_FatBurn_Mins: d.fatBurn, HR_Cardio_Mins: d.cardio, HR_Peak_Mins: d.peak }))
+    
     const rows = Array.from(map.values())
     const headers = Array.from(new Set(rows.flatMap(Object.keys)))
     const csv = [headers.join(','), ...rows.map(r => headers.map(h => r[h] ?? '').join(','))].join('\n')
@@ -165,52 +257,68 @@ export default function App() {
     link.download = `fitbit_charge6_${new Date().toISOString().split('T')[0]}.csv`; link.click()
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+  if (loading && !lastUpdated) return <div className="flex h-screen items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 font-sans">
+    <div className="min-h-screen bg-background text-foreground p-6 font-sans pb-24">
       <div className="max-w-6xl mx-auto space-y-6">
 
-        <header className="flex items-start justify-between">
+        <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-medium bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">FITBIT PLATFORM</span>
-              <span className="text-xs text-muted-foreground">Charge 6 · Last 7 days</span>
+              <span className="text-xs text-muted-foreground">Charge 6 · Last 90 days available</span>
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Fitbit Charge 6 <span className="text-emerald-500">Health Dashboard</span></h1>
             <p className="text-sm text-muted-foreground mt-1">All metrics sourced from your Fitbit Charge 6 via Google Health API</p>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button onClick={downloadCSV} variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export CSV</Button>
-            <Button onClick={downloadAllJSON} variant="outline" size="sm" className="gap-2"><Database className="h-4 w-4" />Export All JSON</Button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {lastUpdated && <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>}
+              <Button onClick={fetchAll} disabled={cooldownTime > 0 || loading} variant="outline" size="sm" className="h-7 px-2">
+                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                {cooldownTime > 0 ? `Wait ${cooldownTime}s` : 'Refresh'}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={downloadCSV} variant="outline" size="sm" className="gap-2 h-8 text-xs"><Download className="h-3 w-3" />Export Full CSV (90d)</Button>
+              <Button onClick={downloadAllJSON} variant="outline" size="sm" className="gap-2 h-8 text-xs"><Database className="h-3 w-3" />Export All JSON (90d)</Button>
+            </div>
           </div>
         </header>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {[
             { label: 'Steps/day', value: summary.avgSteps.toLocaleString(), color: 'text-emerald-400' },
+            { label: 'Active Mins', value: `${summary.avgAct}m`, color: 'text-orange-400' },
+            { label: 'Distance', value: `${(summary.avgDist/1000).toFixed(1)}km`, color: 'text-yellow-400' },
             { label: 'Resting HR', value: `${summary.avgHr} bpm`, color: 'text-rose-400' },
             { label: 'Sleep', value: `${summary.avgSleep}h`, color: 'text-violet-400' },
             { label: 'HRV', value: `${summary.avgHrv}ms`, color: 'text-blue-400' },
-            { label: 'Breathing', value: `${summary.avgResp}/min`, color: 'text-cyan-400' },
-            { label: 'Wrist Temp', value: `${summary.avgTemp}°C`, color: 'text-orange-400' },
             { label: 'SpO2', value: `${summary.avgSpo2}%`, color: 'text-sky-400' },
+            { label: 'Sedentary', value: `${summary.avgSed}h`, color: 'text-gray-400' },
           ].map(s => (
             <Card key={s.label} className="p-3">
-              <p className="text-xs text-muted-foreground">{s.label}</p>
+              <p className="text-xs text-muted-foreground whitespace-nowrap">{s.label}</p>
               <p className={`text-lg font-bold mt-0.5 ${s.color}`}>{s.value}</p>
             </Card>
           ))}
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="recovery">Recovery</TabsTrigger>
-            <TabsTrigger value="sleep">Sleep</TabsTrigger>
-            <TabsTrigger value="raw">Raw Data Explorer</TabsTrigger>
-          </TabsList>
+          
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-background/80 backdrop-blur-md border border-border rounded-full p-1 shadow-lg">
+              <TabsList className="bg-transparent border-none h-auto p-0 gap-1 flex">
+                <TabsTrigger value="overview" className="rounded-full px-4 py-2 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400"><Activity className="h-4 w-4 mr-2" />Overview</TabsTrigger>
+                <TabsTrigger value="activity" className="rounded-full px-4 py-2 data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400"><Flame className="h-4 w-4 mr-2" />Activity</TabsTrigger>
+                <TabsTrigger value="recovery" className="rounded-full px-4 py-2 data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400"><Brain className="h-4 w-4 mr-2" />Recovery</TabsTrigger>
+                <TabsTrigger value="sleep" className="rounded-full px-4 py-2 data-[state=active]:bg-violet-500/20 data-[state=active]:text-violet-400"><Moon className="h-4 w-4 mr-2" />Sleep</TabsTrigger>
+                <TabsTrigger value="raw" className="rounded-full px-4 py-2 data-[state=active]:bg-muted"><Database className="h-4 w-4 mr-2" />Raw Data</TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
@@ -225,6 +333,50 @@ export default function App() {
                 <CardContent>{card.chart}<DataTable rows={card.rows} cols={card.cols} /></CardContent>
               </Card>
             ))}
+          </TabsContent>
+
+          {/* ACTIVITY */}
+          <TabsContent value="activity" className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <Card>
+              <CardHeader className="pb-1 flex flex-row items-center justify-between"><CardTitle className="text-sm">Distance (Meters)</CardTitle><Navigation className="h-4 w-4 text-yellow-500" /></CardHeader>
+              <CardContent>
+                <MiniChart data={data.distance} dataKey="meters" color="#eab308" type="area" />
+                <DataTable rows={data.distance} cols={[{ key: 'date', label: 'Date' }, { key: 'meters', label: 'Meters', cls: 'text-yellow-400 font-medium' }]} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1 flex flex-row items-center justify-between"><CardTitle className="text-sm">Active Minutes</CardTitle><Flame className="h-4 w-4 text-orange-500" /></CardHeader>
+              <CardContent>
+                <MiniChart data={data.activeMins} dataKey="minutes" color="#f97316" />
+                <DataTable rows={data.activeMins} cols={[{ key: 'date', label: 'Date' }, { key: 'minutes', label: 'Minutes', cls: 'text-orange-400 font-medium' }]} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1 flex flex-row items-center justify-between"><CardTitle className="text-sm">Sedentary Hours</CardTitle><Clock className="h-4 w-4 text-gray-400" /></CardHeader>
+              <CardContent>
+                <MiniChart data={data.sedentary} dataKey="hours" color="#9ca3af" />
+                <DataTable rows={data.sedentary} cols={[{ key: 'date', label: 'Date' }, { key: 'hours', label: 'Hours', cls: 'text-gray-400 font-medium' }]} />
+              </CardContent>
+            </Card>
+            <Card className="md:col-span-3">
+              <CardHeader><CardTitle>Daily Heart Rate Zones (Minutes)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.hrZones.slice(-30)} margin={{ left: -20, right: 8, top: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="date" {...ax} /><YAxis {...ax} />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: '8px' }} />
+                      <Bar dataKey="outOfRange" stackId="a" fill="#374151" name="Out of Range" />
+                      <Bar dataKey="fatBurn" stackId="a" fill="#facc15" name="Fat Burn" />
+                      <Bar dataKey="cardio" stackId="a" fill="#fb923c" name="Cardio" />
+                      <Bar dataKey="peak" stackId="a" fill="#ef4444" name="Peak" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <DataTable rows={data.hrZones} cols={[{ key: 'date', label: 'Date' }, { key: 'outOfRange', label: 'Rest', cls: 'text-gray-400' }, { key: 'fatBurn', label: 'Fat Burn', cls: 'text-yellow-400' }, { key: 'cardio', label: 'Cardio', cls: 'text-orange-400' }, { key: 'peak', label: 'Peak', cls: 'text-red-400' }]} />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* RECOVERY */}
@@ -259,7 +411,7 @@ export default function App() {
               <CardContent>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.sleep} margin={{ left: -20, right: 8, top: 4 }}>
+                    <BarChart data={data.sleep.slice(-30)} margin={{ left: -20, right: 8, top: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="date" {...ax} /><YAxis {...ax} />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: '8px' }} />
@@ -280,9 +432,8 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Raw Data Explorer</h2>
-                <p className="text-sm text-muted-foreground">All {ENDPOINTS.length} available Google Health API endpoints from your Fitbit Charge 6</p>
+                <p className="text-sm text-muted-foreground">All {ENDPOINTS.length} available Google Health API endpoints (last 90 days)</p>
               </div>
-              <Button onClick={downloadAllJSON} variant="outline" size="sm" className="gap-2"><Database className="h-4 w-4" />Download All JSON</Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {ENDPOINTS.map(ep => (
