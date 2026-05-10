@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -149,39 +148,57 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 	client := oauthConfig.Client(r.Context(), tok)
 	filterName := strings.ReplaceAll(dataType, "-", "_")
 
-	// 90 days ago for full history
-	startT := time.Now().AddDate(0, 0, -90)
-	startTime := startT.Format(time.RFC3339)
-
-	var resp *http.Response
-	var apiErr error
+	var finalResponse map[string]interface{}
 
 	if dataType == "steps" {
-		// Use dailyRollUp for steps
-		apiURL := fmt.Sprintf("%s/users/me/dataTypes/steps/dataPoints:dailyRollUp", apiBaseURL)
+		var allPoints []interface{}
+		var lastRespObj map[string]interface{}
 		
-		bodyPayload := fmt.Sprintf(`{
-			"range": {
-				"start": {
-					"date": {"year": %d, "month": %d, "day": %d},
-					"time": {"hours": 0, "minutes": 0, "seconds": 0, "nanos": 0}
-				},
-				"end": {
-					"date": {"year": %d, "month": %d, "day": %d},
-					"time": {"hours": 0, "minutes": 0, "seconds": 0, "nanos": 0}
-				}
+		// 90 days in 3 chunks of 30 days to bypass the 33-day limit on dailyRollUp
+		for i := 2; i >= 0; i-- {
+			startT := time.Now().AddDate(0, 0, -30*(i+1))
+			endT := time.Now().AddDate(0, 0, -30*i)
+			if i == 0 {
+				endT = time.Now().AddDate(0, 0, 1) // up to tomorrow
 			}
-		}`, startT.Year(), int(startT.Month()), startT.Day(), time.Now().AddDate(0, 0, 1).Year(), int(time.Now().AddDate(0, 0, 1).Month()), time.Now().AddDate(0, 0, 1).Day())
 
-		req, err := http.NewRequest("POST", apiURL, strings.NewReader(bodyPayload))
-		if err != nil {
-			http.Error(w, "Failed to create request", http.StatusInternalServerError)
-			return
+			apiURL := fmt.Sprintf("%s/users/me/dataTypes/steps/dataPoints:dailyRollUp", apiBaseURL)
+			bodyPayload := fmt.Sprintf(`{
+				"range": {
+					"start": { "date": {"year": %d, "month": %d, "day": %d}, "time": {"hours": 0, "minutes": 0, "seconds": 0, "nanos": 0} },
+					"end": { "date": {"year": %d, "month": %d, "day": %d}, "time": {"hours": 0, "minutes": 0, "seconds": 0, "nanos": 0} }
+				}
+			}`, startT.Year(), int(startT.Month()), startT.Day(), endT.Year(), int(endT.Month()), endT.Day())
+
+			req, _ := http.NewRequest("POST", apiURL, strings.NewReader(bodyPayload))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := client.Do(req)
+			if err != nil {
+				http.Error(w, "API error", http.StatusInternalServerError)
+				return
+			}
+			var chunk map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&chunk)
+			resp.Body.Close()
+
+			if resp.StatusCode == 200 {
+				if pts, ok := chunk["rollupDataPoints"].([]interface{}); ok {
+					allPoints = append(allPoints, pts...)
+				}
+				lastRespObj = chunk
+			} else {
+				if lastRespObj == nil { lastRespObj = chunk }
+			}
 		}
-		req.Header.Set("Content-Type", "application/json")
-		resp, apiErr = client.Do(req)
-
+		if lastRespObj != nil {
+			lastRespObj["rollupDataPoints"] = allPoints
+			finalResponse = lastRespObj
+		}
 	} else {
+		// 90 days for other endpoints, handle pagination
+		startT := time.Now().AddDate(0, 0, -90)
+		startTime := startT.Format(time.RFC3339)
+		
 		var filter string
 		if dataType == "sleep" {
 			filter = fmt.Sprintf("sleep.interval.end_time >= \"%s\"", startTime)
@@ -189,31 +206,62 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 			startDate := startT.Format("2006-01-02")
 			filter = fmt.Sprintf("%s.date >= \"%s\"", filterName, startDate)
 		} else {
-			// interval-based types: active-minutes, distance, active-zone-minutes etc.
 			filter = fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
 		}
 
-		u, err := url.Parse(fmt.Sprintf("%s/users/me/dataTypes/%s/dataPoints", apiBaseURL, dataType))
-		if err != nil {
-			http.Error(w, "Failed to parse URL", http.StatusInternalServerError)
-			return
-		}
+		u, _ := url.Parse(fmt.Sprintf("%s/users/me/dataTypes/%s/dataPoints", apiBaseURL, dataType))
 		q := u.Query()
 		q.Set("filter", filter)
-		u.RawQuery = q.Encode()
 		
-		resp, apiErr = client.Get(u.String())
-	}
+		var allPoints []interface{}
+		var lastRespObj map[string]interface{}
+		pageToken := ""
 
-	if apiErr != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch from Google Health API: %s", apiErr.Error()), http.StatusInternalServerError)
-		return
+		for page := 0; page < 20; page++ { // max 20 pages
+			if pageToken != "" {
+				q.Set("pageToken", pageToken)
+			} else if page > 0 {
+				break
+			}
+			u.RawQuery = q.Encode()
+
+			resp, err := client.Get(u.String())
+			if err != nil { break }
+			
+			var chunk map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&chunk)
+			resp.Body.Close()
+
+			if resp.StatusCode == 200 {
+				if pts, ok := chunk["dataPoints"].([]interface{}); ok {
+					allPoints = append(allPoints, pts...)
+				}
+				lastRespObj = chunk
+				if token, ok := chunk["nextPageToken"].(string); ok && token != "" {
+					pageToken = token
+				} else {
+					break
+				}
+			} else {
+				if lastRespObj == nil { lastRespObj = chunk }
+				break
+			}
+		}
+
+		if lastRespObj != nil {
+			lastRespObj["dataPoints"] = allPoints
+			delete(lastRespObj, "nextPageToken")
+			finalResponse = lastRespObj
+		}
 	}
-	defer resp.Body.Close()
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	if finalResponse == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "Failed to fetch data"}`))
+		return
+	}
+	json.NewEncoder(w).Encode(finalResponse)
 }
 
 // Helpers for token persistence
