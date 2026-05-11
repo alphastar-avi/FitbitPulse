@@ -22,7 +22,6 @@ const ENDPOINTS = [
   { type: 'active-minutes', label: 'Active Minutes', description: 'Individual minutes of physical activity.', icon: '🏃' },
   { type: 'distance', label: 'Distance', description: 'Distance traveled in meters.', icon: '📍' },
   { type: 'sedentary-period', label: 'Sedentary Periods', description: 'Periods of inactivity.', icon: '🪑' },
-  { type: 'daily-heart-rate-zones', label: 'Daily Heart Rate Zones', description: 'Daily summary of time spent in each heart rate zone.', icon: '💓' },
 ]
 
 function MiniChart({ data, dataKey, color, type = 'bar' }: any) {
@@ -66,7 +65,7 @@ function DataTable({ rows, cols }: { rows: any[], cols: { key: string, label: st
 }
 
 export default function App() {
-  const [data, setData] = useState<any>({ steps: [], hr: [], sleep: [], hrv: [], resp: [], wristTemp: [], spo2: [], distance: [], activeMins: [], activeZones: [], sedentary: [], hrZones: [] })
+  const [data, setData] = useState<any>({ steps: [], hr: [], sleep: [], hrv: [], resp: [], wristTemp: [], spo2: [], distance: [], activeMins: [], activeZones: [], sedentary: [] })
   const [rawCache, setRawCache] = useState<Record<string, any>>({})
   const [loadingRaw, setLoadingRaw] = useState<Record<string, boolean>>({})
   const [summary, setSummary] = useState<any>({})
@@ -100,9 +99,9 @@ export default function App() {
     
     setLoading(true)
     try {
-      const types = ['steps','daily-resting-heart-rate','sleep','daily-heart-rate-variability','daily-respiratory-rate','daily-sleep-temperature-derivations','daily-oxygen-saturation', 'distance', 'active-minutes', 'active-zone-minutes', 'sedentary-period', 'daily-heart-rate-zones']
+      const types = ['steps','daily-resting-heart-rate','sleep','daily-heart-rate-variability','daily-respiratory-rate','daily-sleep-temperature-derivations','daily-oxygen-saturation', 'distance', 'active-minutes', 'active-zone-minutes', 'sedentary-period']
       const results = await Promise.all(types.map(t => fetch(`${API_BASE}?type=${t}`).then(r => r.json()).catch(() => ({}))))
-      const [stepsJ, hrJ, sleepJ, hrvJ, respJ, tempJ, spo2J, distJ, actMinsJ, actZoneJ, sedJ, hrZonJ] = results
+      const [stepsJ, hrJ, sleepJ, hrvJ, respJ, tempJ, spo2J, distJ, actMinsJ, actZoneJ, sedJ] = results
 
       const formatDt = (y: number, m: number, d: number) => {
         const dt = new Date(y, m - 1, d)
@@ -183,15 +182,7 @@ export default function App() {
       })
       const sedentary = Array.from(sedMap.values()).map(d => ({ ...d, hours: parseFloat((d.minutes / 60).toFixed(1)) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
 
-      // Daily Heart Rate Zones
-      const hrZones = (hrZonJ.dataPoints || []).map((d: any) => {
-        const { date, rawDate } = formatDt(d.dailyHeartRateZones.date.year, d.dailyHeartRateZones.date.month, d.dailyHeartRateZones.date.day)
-        const z = d.dailyHeartRateZones.heartRateZones || []
-        const mins = (type: string) => parseInt(z.find((x: any) => x.heartRateZoneType === type)?.minutes || '0')
-        return { date, rawDate, outOfRange: mins('OUT_OF_RANGE'), fatBurn: mins('FAT_BURN'), cardio: mins('CARDIO'), peak: mins('PEAK') }
-      }).sort((a: any, b: any) => a.rawDate - b.rawDate)
-
-      setData({ steps, hr, sleep, hrv, resp, wristTemp, spo2, distance, activeMins, activeZones, sedentary, hrZones })
+      setData({ steps, hr, sleep, hrv, resp, wristTemp, spo2, distance, activeMins, activeZones, sedentary })
 
       const avg = (arr: any[], key: string) => arr.length ? Math.round(arr.reduce((s, d) => s + d[key], 0) / arr.length * 10) / 10 : 0
       setSummary({ 
@@ -247,7 +238,6 @@ export default function App() {
     data.activeMins.forEach((d: any) => merge(d.date, { Active_Minutes: d.minutes }))
     data.activeZones.forEach((d: any) => merge(d.date, { Zone_FatBurn_Mins: d.fatBurn, Zone_Cardio_Mins: d.cardio, Zone_Peak_Mins: d.peak }))
     data.sedentary.forEach((d: any) => merge(d.date, { Sedentary_Hours: d.hours }))
-    data.hrZones.forEach((d: any) => merge(d.date, { HR_Out_Mins: d.outOfRange, HR_FatBurn_Mins: d.fatBurn, HR_Cardio_Mins: d.cardio, HR_Peak_Mins: d.peak }))
     
     const rows = Array.from(map.values())
     const headers = Array.from(new Set(rows.flatMap(Object.keys)))
@@ -363,18 +353,17 @@ export default function App() {
               <CardContent>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.hrZones.slice(-30)} margin={{ left: -20, right: 8, top: 4 }}>
+                    <BarChart data={data.activeZones.slice(-30)} margin={{ left: -20, right: 8, top: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="date" {...ax} /><YAxis {...ax} />
                       <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: '8px' }} />
-                      <Bar dataKey="outOfRange" stackId="a" fill="#374151" name="Out of Range" />
                       <Bar dataKey="fatBurn" stackId="a" fill="#facc15" name="Fat Burn" />
                       <Bar dataKey="cardio" stackId="a" fill="#fb923c" name="Cardio" />
                       <Bar dataKey="peak" stackId="a" fill="#ef4444" name="Peak" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <DataTable rows={data.hrZones} cols={[{ key: 'date', label: 'Date' }, { key: 'outOfRange', label: 'Rest', cls: 'text-gray-400' }, { key: 'fatBurn', label: 'Fat Burn', cls: 'text-yellow-400' }, { key: 'cardio', label: 'Cardio', cls: 'text-orange-400' }, { key: 'peak', label: 'Peak', cls: 'text-red-400' }]} />
+                <DataTable rows={data.activeZones} cols={[{ key: 'date', label: 'Date' }, { key: 'fatBurn', label: 'Fat Burn', cls: 'text-yellow-400' }, { key: 'cardio', label: 'Cardio', cls: 'text-orange-400' }, { key: 'peak', label: 'Peak', cls: 'text-red-400' }]} />
               </CardContent>
             </Card>
           </TabsContent>
