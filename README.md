@@ -2,10 +2,13 @@
 
 A Go application to frequently download and display Fitbit Charge 6 health data.
 
-## Prerequisites
+<img width="1348" height="1017" alt="Screenshot 2026-05-10 at 10 46 49 PM" src="https://github.com/user-attachments/assets/eb0b69ae-4af1-4635-b866-efcf459afc74" />
 
-- Go 1.20+
-- Google Cloud Project credentials (Client ID and Client Secret)
+<img width="1348" height="1017" alt="Screenshot 2026-05-10 at 10 47 13 PM" src="https://github.com/user-attachments/assets/ca7f5c73-905f-47a8-a8e9-791334fc517d" />
+
+<img width="1348" height="1017" alt="Screenshot 2026-05-10 at 10 47 22 PM" src="https://github.com/user-attachments/assets/f665b22d-55ba-430d-93f6-ccce77b7d54d" />
+
+and more!
 
 ## Setup
 
