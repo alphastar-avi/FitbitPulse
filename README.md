@@ -12,6 +12,15 @@ A Go application to frequently download and display Fitbit Charge 6 health data.
 
 and more!
 
+## Features
+
+* **Steps & Activity Tracking**: Daily steps, active zone minutes, sedentary periods, and distance measurements.
+* **Vitals & Recovery**: Resting heart rate, heart rate variability (HRV), wrist skin temperature derivations, and average breathing rate.
+* **Sleep Stages Analysis**: Visual breakdown of deep, REM, light, and awake intervals from nightly sleep sessions.
+* **Sleep Oxygen Saturation & EOV**: Passive blood oxygen (SpO2) monitoring showing nightly ranges, standard deviation, and dynamic estimated oxygen variation (EOV) timelines mapping transient desaturations.
+* **Data Portability**: Full history exports available in CSV and JSON formats.
+* **Raw Data Explorer**: Direct JSON payload viewing for all queried Google Health API (Fitbit Charge 6) endpoints.
+
 ## Setup
 
 1. Clone the repository.
