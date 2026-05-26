@@ -196,7 +196,12 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 90 days for other endpoints, handle pagination
-		startT := time.Now().AddDate(0, 0, -90)
+		var startT time.Time
+		if dataType == "oxygen-saturation" {
+			startT = time.Now().AddDate(0, 0, -7)
+		} else {
+			startT = time.Now().AddDate(0, 0, -90)
+		}
 		startTime := startT.Format(time.RFC3339)
 		
 		var filter string
@@ -205,6 +210,8 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 		} else if strings.HasPrefix(dataType, "daily-") {
 			startDate := startT.Format("2006-01-02")
 			filter = fmt.Sprintf("%s.date >= \"%s\"", filterName, startDate)
+		} else if dataType == "oxygen-saturation" {
+			filter = fmt.Sprintf("oxygen_saturation.sample_time.physical_time >= \"%s\"", startTime)
 		} else {
 			filter = fmt.Sprintf("%s.interval.start_time >= \"%s\"", filterName, startTime)
 		}

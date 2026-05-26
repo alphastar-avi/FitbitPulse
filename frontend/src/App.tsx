@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Activity, Heart, Moon, Loader2, Download, Wind, Thermometer, Brain, Droplets, Database, RefreshCw, Flame, Navigation, Clock } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, YAxis, AreaChart, Area } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, YAxis, AreaChart, Area, ReferenceLine } from "recharts"
 
 const API_BASE = "/api/raw"
 
@@ -65,7 +65,7 @@ function DataTable({ rows, cols }: { rows: any[], cols: { key: string, label: st
 }
 
 export default function App() {
-  const [data, setData] = useState<any>({ steps: [], hr: [], sleep: [], hrv: [], resp: [], wristTemp: [], spo2: [], distance: [], activeMins: [], activeZones: [], sedentary: [] })
+  const [data, setData] = useState<any>({ steps: [], hr: [], sleep: [], hrv: [], resp: [], wristTemp: [], spo2: [], distance: [], activeMins: [], activeZones: [], sedentary: [], oxygenIntraday: [] })
   const [rawCache, setRawCache] = useState<Record<string, any>>({})
   const [loadingRaw, setLoadingRaw] = useState<Record<string, boolean>>({})
   const [summary, setSummary] = useState<any>({})
@@ -99,9 +99,9 @@ export default function App() {
     
     setLoading(true)
     try {
-      const types = ['steps','daily-resting-heart-rate','sleep','daily-heart-rate-variability','daily-respiratory-rate','daily-sleep-temperature-derivations','daily-oxygen-saturation', 'distance', 'active-minutes', 'active-zone-minutes', 'sedentary-period']
+      const types = ['steps','daily-resting-heart-rate','sleep','daily-heart-rate-variability','daily-respiratory-rate','daily-sleep-temperature-derivations','daily-oxygen-saturation', 'distance', 'active-minutes', 'active-zone-minutes', 'sedentary-period', 'oxygen-saturation']
       const results = await Promise.all(types.map(t => fetch(`${API_BASE}?type=${t}`).then(r => r.json()).catch(() => ({}))))
-      const [stepsJ, hrJ, sleepJ, hrvJ, respJ, tempJ, spo2J, distJ, actMinsJ, actZoneJ, sedJ] = results
+      const [stepsJ, hrJ, sleepJ, hrvJ, respJ, tempJ, spo2J, distJ, actMinsJ, actZoneJ, sedJ, oxygenSatJ] = results
 
       const formatDt = (y: number, m: number, d: number) => {
         const dt = new Date(y, m - 1, d)
@@ -119,7 +119,16 @@ export default function App() {
       const sleep = (sleepJ.dataPoints || []).filter((d: any) => d.sleep?.summary).map((d: any) => {
         const stages: any[] = d.sleep.summary.stagesSummary || []
         const mins = (type: string) => parseFloat(((parseInt(stages.find((s: any) => s.type === type)?.minutes ?? '0') || 0) / 60).toFixed(1))
-        return { ...formatIso(d.sleep.interval.startTime), hours: parseFloat(((parseInt(d.sleep.summary.minutesAsleep ?? '0') || 0) / 60).toFixed(1)), deep: mins('DEEP'), rem: mins('REM'), light: mins('LIGHT'), awake: mins('AWAKE') }
+        return { 
+          ...formatIso(d.sleep.interval.startTime), 
+          startTime: d.sleep.interval.startTime,
+          endTime: d.sleep.interval.endTime,
+          hours: parseFloat(((parseInt(d.sleep.summary.minutesAsleep ?? '0') || 0) / 60).toFixed(1)), 
+          deep: mins('DEEP'), 
+          rem: mins('REM'), 
+          light: mins('LIGHT'), 
+          awake: mins('AWAKE') 
+        }
       }).sort((a: any, b: any) => a.rawDate - b.rawDate)
 
       const hrv = (hrvJ.dataPoints || []).map((d: any) => ({ ...formatDt(d.dailyHeartRateVariability.date.year, d.dailyHeartRateVariability.date.month, d.dailyHeartRateVariability.date.day), hrv: d.dailyHeartRateVariability.averageHeartRateVariabilityMilliseconds ?? 0, entropy: parseFloat(Number(d.dailyHeartRateVariability.entropy || 0).toFixed(2)), rmssd: parseFloat(Number(d.dailyHeartRateVariability.deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds || 0).toFixed(1)) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
@@ -133,7 +142,21 @@ export default function App() {
         return { ...formatDt(t.date.year, t.date.month, t.date.day), nightly, baseline, deviation: parseFloat((nightly - baseline).toFixed(2)) }
       }).sort((a: any, b: any) => a.rawDate - b.rawDate)
 
-      const spo2 = (spo2J.dataPoints || []).map((d: any) => ({ ...formatDt(d.dailyOxygenSaturation.date.year, d.dailyOxygenSaturation.date.month, d.dailyOxygenSaturation.date.day), avg: parseFloat(Number(d.dailyOxygenSaturation.averagePercentage || 0).toFixed(1)), low: Number(d.dailyOxygenSaturation.lowerBoundPercentage || 0), high: Number(d.dailyOxygenSaturation.upperBoundPercentage || 0) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
+      const spo2 = (spo2J.dataPoints || []).map((d: any) => {
+        const s = d.dailyOxygenSaturation
+        const avg = parseFloat(Number(s.averagePercentage || 0).toFixed(1))
+        const low = Number(s.lowerBoundPercentage || 0)
+        const high = Number(s.upperBoundPercentage || 0)
+        const sd = parseFloat(Number(s.standardDeviationPercentage || 0).toFixed(2))
+        return {
+          ...formatDt(s.date.year, s.date.month, s.date.day),
+          avg,
+          low,
+          high,
+          sd,
+          range: [low, high]
+        }
+      }).sort((a: any, b: any) => a.rawDate - b.rawDate)
 
       // Activity: distance (meters)
       const distMap = new Map();
@@ -182,7 +205,16 @@ export default function App() {
       })
       const sedentary = Array.from(sedMap.values()).map(d => ({ ...d, hours: parseFloat((d.minutes / 60).toFixed(1)) })).sort((a: any, b: any) => a.rawDate - b.rawDate)
 
-      setData({ steps, hr, sleep, hrv, resp, wristTemp, spo2, distance, activeMins, activeZones, sedentary })
+      const oxygenIntraday = (oxygenSatJ.dataPoints || []).map((d: any) => {
+        const o = d.oxygenSaturation
+        return {
+          time: new Date(o.sampleTime.physicalTime),
+          percentage: o.percentage,
+          dateStr: `${o.sampleTime.civilTime.date.year}-${o.sampleTime.civilTime.date.month}-${o.sampleTime.civilTime.date.day}`
+        }
+      }).sort((a: any, b: any) => a.time - b.time)
+
+      setData({ steps, hr, sleep, hrv, resp, wristTemp, spo2, distance, activeMins, activeZones, sedentary, oxygenIntraday })
 
       const avg = (arr: any[], key: string) => arr.length ? Math.round(arr.reduce((s, d) => s + d[key], 0) / arr.length * 10) / 10 : 0
       setSummary({ 
@@ -394,7 +426,7 @@ export default function App() {
           </TabsContent>
 
           {/* SLEEP */}
-          <TabsContent value="sleep" className="mt-4">
+          <TabsContent value="sleep" className="space-y-6 mt-4">
             <Card>
               <CardHeader><CardTitle>Sleep Stage Breakdown</CardTitle></CardHeader>
               <CardContent>
@@ -414,6 +446,294 @@ export default function App() {
                 <DataTable rows={data.sleep} cols={[{ key: 'date', label: 'Date' }, { key: 'hours', label: 'Total', cls: 'text-foreground font-medium' }, { key: 'deep', label: 'Deep', cls: 'text-indigo-400' }, { key: 'rem', label: 'REM', cls: 'text-violet-400' }, { key: 'light', label: 'Light', cls: 'text-purple-300' }, { key: 'awake', label: 'Awake', cls: 'text-amber-400' }]} />
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Wind className="h-5 w-5 text-sky-400" />
+                      Estimated Oxygen Variation (EOV) & SpO2
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Monitors blood oxygen saturation during sleep. High variations (drops below 90%) can indicate breathing disturbances.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-400">
+                      Active Sleep Monitor
+                    </span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Stats Summary Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-muted/30 border border-border/40 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground">Average Sleep SpO2</p>
+                    <p className="text-xl font-bold text-sky-400 mt-1">
+                      {data.spo2.length ? (data.spo2.reduce((acc: number, d: any) => acc + d.avg, 0) / data.spo2.length).toFixed(1) : 'N/A'}%
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 border border-border/40 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground">Lowest Nightly SpO2</p>
+                    <p className="text-xl font-bold text-amber-500 mt-1">
+                      {data.spo2.length ? Math.min(...data.spo2.map((d: any) => d.low)) : 'N/A'}%
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 border border-border/40 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground">Highest Nightly SpO2</p>
+                    <p className="text-xl font-bold text-emerald-400 mt-1">
+                      {data.spo2.length ? Math.max(...data.spo2.map((d: any) => d.high)) : 'N/A'}%
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 border border-border/40 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground">High Variation Nights</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {(() => {
+                        const count = data.spo2.filter((d: any) => d.low < 90).length;
+                        return (
+                          <>
+                            <span className={`text-xl font-bold ${count > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {count}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              (SpO2 &lt; 90%)
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* The EOV Chart */}
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data.spo2.slice(-30)} margin={{ left: -20, right: 8, top: 10, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id="eovColor" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity="0.3"/>
+                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.02}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="date" {...ax} />
+                      <YAxis {...ax} domain={[80, 100]} ticks={[80, 85, 90, 95, 100]} unit="%" />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: '8px' }}
+                        formatter={(value: any, name: any) => {
+                          if (name === 'avg') return [`${value}%`, 'Average SpO2'];
+                          if (Array.isArray(value)) return [`${value[0]}% - ${value[1]}%`, 'Oxygen Range'];
+                          return [`${value}%`, name];
+                        }}
+                      />
+                      <ReferenceLine 
+                        y={90} 
+                        stroke="#ef4444" 
+                        strokeDasharray="4 4" 
+                        label={{ value: 'Variation Threshold (90%)', position: 'top', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="range" 
+                        stroke="#0ea5e9" 
+                        strokeWidth={1.5} 
+                        fillOpacity={1} 
+                        fill="url(#eovColor)" 
+                        name="Oxygen Range" 
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="avg" 
+                        stroke="#38bdf8" 
+                        strokeWidth={2.5} 
+                        dot={{ r: 3, fill: '#38bdf8', strokeWidth: 0 }} 
+                        activeDot={{ r: 5 }} 
+                        name="avg"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* EOV Table */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Nightly Oxygen Variation Log</h4>
+                  <DataTable 
+                    rows={data.spo2.map((d: any) => ({
+                      ...d,
+                      variation: d.low < 90 ? '🔴 High (Frequent Drops)' : '🟢 Low (Normal)',
+                      avgSpO2: `${d.avg}%`,
+                      range: `${d.low}% - ${d.high}%`,
+                      sdVal: d.sd ? `${d.sd}%` : 'N/A'
+                    }))} 
+                    cols={[
+                      { key: 'date', label: 'Date' },
+                      { key: 'avgSpO2', label: 'Average SpO2', cls: 'text-sky-400 font-medium' },
+                      { key: 'range', label: 'Oxygen Range (Low - High)' },
+                      { key: 'sdVal', label: 'Standard Deviation' },
+                      { key: 'variation', label: 'Oxygen Variation', cls: 'font-medium' }
+                    ]} 
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tonight's Intraday EOV Card (Fitbit App Style) */}
+            {(() => {
+              const intraday = data.oxygenIntraday || [];
+              let sessionPoints: any[] = [];
+              let activeSession: any = null;
+
+              for (let i = data.sleep.length - 1; i >= 0; i--) {
+                const session = data.sleep[i];
+                if (!session.startTime || !session.endTime) continue;
+                const start = new Date(session.startTime);
+                const end = new Date(session.endTime);
+                
+                const pts = intraday.filter((pt: any) => {
+                  const t = new Date(pt.time);
+                  return t >= start && t <= end && pt.percentage >= 80;
+                });
+                
+                if (pts.length > 5) {
+                  sessionPoints = pts;
+                  activeSession = session;
+                  break;
+                }
+              }
+
+              if (!activeSession || sessionPoints.length === 0) {
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Wind className="h-5 w-5 text-sky-400" />
+                        Today's Estimated Oxygen Variation Timeline
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                      No matching intraday SpO2 timeline data found for recent sleep sessions.
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              const sessionAvg = sessionPoints.reduce((acc: number, pt: any) => acc + pt.percentage, 0) / sessionPoints.length;
+              
+              const chartData = sessionPoints.map((pt: any) => {
+                const percentage = pt.percentage;
+                const variation = Math.max(0, parseFloat((sessionAvg - percentage).toFixed(2)));
+                const t = new Date(pt.time);
+                return {
+                  timeStr: t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                  variation,
+                  percentage,
+                  rawTime: t
+                };
+              });
+
+              const maxVar = Math.max(...chartData.map(d => d.variation), 0);
+              const isHigh = maxVar > 4.0;
+              const titleText = isHigh 
+                ? "Your estimated oxygen variation was high" 
+                : maxVar > 2.5 
+                  ? "Your estimated oxygen variation was medium" 
+                  : "Your estimated oxygen variation was low";
+
+              const startT = new Date(activeSession.startTime);
+              const endT = new Date(activeSession.endTime);
+              const dateStr = startT.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+              const timeRangeStr = `${startT.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${endT.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+
+              const maxVal = Math.max(...chartData.map(d => d.variation), 6);
+              const thresholdVal = 3.5;
+              const off = (maxVal - thresholdVal) / maxVal;
+
+              return (
+                <Card className="bg-gradient-to-br from-card to-card/50 border border-border/80 shadow-md">
+                  <CardHeader className="pb-2 border-b border-border/30">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">{titleText}</h2>
+                        <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          {dateStr} • {timeRangeStr}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider ${isHigh ? 'bg-orange-500/20 text-orange-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                        {isHigh ? 'Attention' : 'Normal variation'}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-6">
+                    <div className="h-[280px] w-full relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ left: -25, right: 10, top: 10, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#fb923c" stopOpacity={0.7} />
+                              <stop offset={off} stopColor="#fb923c" stopOpacity={0.7} />
+                              <stop offset={off} stopColor="#7c3aed" stopOpacity={0.5} />
+                              <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.5} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
+                          <XAxis 
+                            dataKey="timeStr" 
+                            {...ax} 
+                            tickMargin={10}
+                            interval={Math.ceil(chartData.length / 4)}
+                          />
+                          <YAxis 
+                            {...ax} 
+                            domain={[0, maxVal]} 
+                            ticks={[0, 2, 3.5, 5, maxVal > 6 ? Math.ceil(maxVal) : 6]}
+                            tickFormatter={(v) => v === 3.5 ? 'Limit' : v}
+                          />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: 'hsl(var(--popover))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: '8px' }}
+                            formatter={(value: any, name: any) => {
+                              if (name === 'variation') return [value, 'Variation Score'];
+                              if (name === 'percentage') return [`${value}%`, 'Blood Oxygen'];
+                              return [value, name];
+                            }}
+                          />
+                          <ReferenceLine 
+                            y={3.5} 
+                            stroke="#fb923c" 
+                            strokeDasharray="3 3" 
+                            strokeWidth={1.5}
+                            label={{ value: 'High Variation Threshold', position: 'top', fill: '#fb923c', fontSize: 10, fontWeight: 'medium' }} 
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="variation" 
+                            stroke="url(#splitColor)" 
+                            strokeWidth={2.5} 
+                            fillOpacity={1} 
+                            fill="url(#splitColor)" 
+                            name="variation"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Legend bar resembling Fitbit's exact style */}
+                    <div className="flex items-center justify-center gap-6 pt-2 border-t border-border/30 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                        <span className="font-medium text-muted-foreground">Low Variation</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-orange-400"></span>
+                        <span className="font-medium text-muted-foreground">High Variation (Drops in SpO2)</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </TabsContent>
 
           {/* RAW DATA EXPLORER */}
