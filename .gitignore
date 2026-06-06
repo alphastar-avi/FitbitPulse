@@ -23,3 +23,6 @@ token.json
 
 # Vite cache
 frontend/.vite/
+
+# Compiled MCP binary
+mcp-server-bin

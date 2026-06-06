@@ -28,3 +28,49 @@ and more!
 3. Run `go mod tidy` to install dependencies.
 4. Run `go run main.go` to start the server.
 5. Open `http://localhost:8080/login` in your browser to authenticate.
+
+---
+
+## Model Context Protocol (MCP) Server
+
+I built a Model Context Protocol (MCP) server for this project to expose all of the Fitbit Charge 6 health metrics directly to AI assistants (like Claude Desktop or Cursor). This allows an LLM to query my daily steps, resting heart rate, sleep stages, heart rate variability (HRV), and more.
+
+### Features of the MCP Server
+- **Auto Token Refresh**: Reuses the OAuth2 configuration and automatically refreshes and saves the token to `token.json` when it expires.
+- **Google API Workarounds**: Automatically handles steps chunking (bypassing Google's 33-day query limit) and handles camelCase schemas for queries.
+- **Stdio Transport**: Communicates over standard stdin/stdout for easy local integration.
+
+### Exposed Tools
+- `get_steps`: Fetch steps daily rollup (up to 90 days).
+- `get_sleep_sessions`: Fetch sleep durations and stage breakdowns (REM, deep, light, awake).
+- `get_resting_heart_rate`: Fetch daily resting heart rate metrics (BPM).
+- `get_hrv`: Fetch Heart Rate Variability (entropy, RMSSD, average ms).
+- `get_breathing_rate`: Fetch nightly average breaths per minute.
+- `get_wrist_temperature`: Fetch nightly wrist temperature deviations against baseline.
+- `get_blood_oxygen`: Fetch nightly SpO2 average and range (max 7 days).
+- `get_activity_metrics`: Combined activity metrics (distance, active minutes, active zone minutes, sedentary periods).
+- `get_dashboard_summary`: Aggregate summary of 30-day averages across all metrics.
+
+### Setup and Running the MCP Server
+
+1. **Build the MCP binary**:
+   ```bash
+   go build -o mcp-server-bin ./mcp-server
+   ```
+
+2. **Configure Claude Desktop**:
+   Open your Claude Desktop config (usually at `~/Library/Application Support/Claude/claude_desktop_config.json`) and add the server:
+   ```json
+   {
+     "mcpServers": {
+       "fitbit-pulse": {
+         "command": "/path/to/FitbitPulse/mcp-server-bin",
+         "cwd": "/path/to/FitbitPulse"
+       }
+     }
+   }
+   ```
+
+3. **Configure Cursor**:
+   Go to **Settings > Features > MCP**, click **Add New MCP Server**, choose type `command`, and set the command path:
+   `/path/to/FitbitPulse/mcp-server-bin`
