@@ -64,19 +64,26 @@ func main() {
 	formatFlag := flag.String("format", "json", "Output format: json or csv")
 	outFlag := flag.String("out", "", "Output file path (default is stdout)")
 	daysFlag := flag.Int("days", 30, "Number of days of data to retrieve (1-90)")
+	allFlag := flag.Bool("all", false, "Retrieve all available history (90 days)")
 
 	flag.Parse()
 
-	// Handle positional argument for days count if provided
+	// Handle positional argument for days count or 'all' if provided
 	args := flag.Args()
 	if len(args) > 0 {
-		if val, err := strconv.Atoi(args[0]); err == nil {
+		if args[0] == "all" {
+			*allFlag = true
+		} else if val, err := strconv.Atoi(args[0]); err == nil {
 			*daysFlag = val
 		}
 	}
 
+	if *allFlag {
+		*daysFlag = 90
+	}
+
 	if *daysFlag <= 0 || *daysFlag > 90 {
-		log.Fatalf("Invalid days count: %d. Please specify a value between 1 and 90.", *daysFlag)
+		log.Fatalf("Invalid days count: %d. Please specify a value between 1 and 90, or use -all / all.", *daysFlag)
 	}
 
 	// Locate and load .env and token.json
