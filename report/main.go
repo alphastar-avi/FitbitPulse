@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"math"
+
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -753,19 +755,23 @@ func parseNumeric(val interface{}) float64 {
 	if val == nil {
 		return 0
 	}
+	var res float64
 	switch v := val.(type) {
 	case float64:
-		return v
+		res = v
 	case string:
 		var f float64
 		fmt.Sscanf(v, "%f", &f)
-		return f
+		res = f
 	case int:
-		return float64(v)
+		res = float64(v)
 	case int64:
-		return float64(v)
+		res = float64(v)
 	}
-	return 0
+	if math.IsNaN(res) || math.IsInf(res, 0) {
+		return 0
+	}
+	return res
 }
 
 func parseFloatLimit(val float64, decimals int) float64 {
