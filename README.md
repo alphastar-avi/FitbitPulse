@@ -73,4 +73,33 @@ I built a Model Context Protocol (MCP) server for this project to expose all of 
 
 3. **Configure Cursor**:
    Go to **Settings > Features > MCP**, click **Add New MCP Server**, choose type `command`, and set the command path:
-   `/path/to/FitbitPulse/mcp-server-bin`
+    `/path/to/FitbitPulse/mcp-server-bin`
+
+---
+
+## Report CLI Tool
+
+A command-line interface (CLI) to fetch, merge, and export consolidated Fitbit/Google Health metrics.
+
+### Building the CLI
+```bash
+go build -o report/report ./report
+```
+
+### Usage
+Run the binary with the number of days or flags:
+```bash
+# Retrieve last 7 days of metrics in JSON (default)
+./report/report 7
+
+# Retrieve all available history (90 days) in JSON
+./report/report all
+# Or using the flag:
+./report/report -all
+
+# Export last 30 days of metrics in CSV format
+./report/report -format csv 30
+
+# Export last 30 days of metrics to a CSV file
+./report/report -format csv -out summary.csv 30
+```
