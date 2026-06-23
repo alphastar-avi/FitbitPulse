@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Activity, Heart, Moon, Loader2, Download, Wind, Thermometer, Brain, Droplets, Database, RefreshCw, Flame, Navigation, Clock, Calendar, Sparkles, Footprints, TrendingUp, TrendingDown } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, YAxis, AreaChart, Area, ReferenceLine, PieChart, Pie, Cell } from "recharts"
+import { Bar, BarChart, ComposedChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, YAxis, AreaChart, Area, ReferenceLine, PieChart, Pie, Cell } from "recharts"
 
 const API_BASE = "/api/raw"
 
@@ -256,6 +256,7 @@ export default function App() {
     const getOrCreate = (dateStr: string, rawDate: Date) => {
       if (!map.has(dateStr)) {
         map.set(dateStr, {
+          date: dateStr,
           dateStr,
           rawDate,
           steps: 0,
@@ -777,8 +778,8 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={current30} margin={{ top: 10, right: -15, left: -20, bottom: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <ComposedChart data={current30} margin={{ top: 10, right: -15, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
                       <XAxis dataKey="date" {...ax} />
                       <YAxis yAxisId="left" {...ax} label={{ value: 'Steps', angle: -90, position: 'insideLeft', offset: 0, fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
@@ -786,7 +787,7 @@ export default function App() {
                       <Tooltip {...ttStyle} />
                       <Bar yAxisId="left" dataKey="steps" fill="#10b981" radius={[3, 3, 0, 0]} name="Steps" />
                       <Line yAxisId="right" type="monotone" dataKey="azMinutes" stroke="#84cc16" strokeWidth={2} dot={{ r: 2 }} name="Active Zone Min" />
-                    </BarChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
@@ -804,8 +805,8 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={current30} margin={{ top: 10, right: -15, left: -20, bottom: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <ComposedChart data={current30} margin={{ top: 10, right: -15, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
                       <XAxis dataKey="date" {...ax} />
                       <YAxis yAxisId="left" {...ax} label={{ value: 'Hours', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
@@ -813,7 +814,7 @@ export default function App() {
                       <Tooltip {...ttStyle} />
                       <Bar yAxisId="left" dataKey="sleepHours" fill="#6366f1" radius={[3, 3, 0, 0]} name="Duration (hrs)" />
                       <Line yAxisId="right" type="monotone" dataKey="sleepScore" stroke="#c084fc" strokeWidth={2} dot={{ r: 2 }} name="Sleep Score" />
-                    </BarChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-border/30 text-center">
