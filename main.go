@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,6 +140,14 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	days := 90
+	daysStr := r.URL.Query().Get("days")
+	if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 90 {
+			days = d
+		}
+	}
+
 	tok, err := tokenFromFile(tokenFile)
 	if err != nil {
 		http.Error(w, "Not authenticated. Go to /login first.", http.StatusUnauthorized)
@@ -154,10 +163,18 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 		var allPoints []interface{}
 		var lastRespObj map[string]interface{}
 		
-		// 90 days in 3 chunks of 30 days to bypass the 33-day limit on dailyRollUp
-		for i := 2; i >= 0; i-- {
-			startT := time.Now().AddDate(0, 0, -30*(i+1))
-			endT := time.Now().AddDate(0, 0, -30*i)
+		chunkSize := 30
+		numChunks := (days + chunkSize - 1) / chunkSize
+		
+		for i := numChunks - 1; i >= 0; i-- {
+			startOffset := -chunkSize * (i + 1)
+			endOffset := -chunkSize * i
+			if i == numChunks-1 && days%chunkSize != 0 {
+				startOffset = -days
+			}
+
+			startT := time.Now().AddDate(0, 0, startOffset)
+			endT := time.Now().AddDate(0, 0, endOffset)
 			if i == 0 {
 				endT = time.Now().AddDate(0, 0, 1) // up to tomorrow
 			}
@@ -195,12 +212,12 @@ func handleRawData(w http.ResponseWriter, r *http.Request) {
 			finalResponse = lastRespObj
 		}
 	} else {
-		// 90 days for other endpoints, handle pagination
+		// days for other endpoints, handle pagination
 		var startT time.Time
 		if dataType == "oxygen-saturation" {
 			startT = time.Now().AddDate(0, 0, -7)
 		} else {
-			startT = time.Now().AddDate(0, 0, -90)
+			startT = time.Now().AddDate(0, 0, -days)
 		}
 		startTime := startT.Format(time.RFC3339)
 		
