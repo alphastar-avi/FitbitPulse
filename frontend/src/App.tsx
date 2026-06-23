@@ -29,7 +29,7 @@ function MiniChart({ data, dataKey, color, type = 'bar', days = 30 }: any) {
   const displayData = data.slice(-days)
   return (
     <div className="h-[100px] mt-2">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={100} minWidth={0}>
         {type === 'line' ? (
           <LineChart data={displayData} margin={{ top: 2, right: 4, left: -30, bottom: 0 }}>
             <XAxis dataKey="date" {...ax} tick={false} /><YAxis {...ax} domain={['dataMin - 2', 'dataMax + 2']} />
@@ -442,11 +442,12 @@ export default function App() {
   const topSleepDay = sleepWithDataCurrent.length ? [...sleepWithDataCurrent].sort((a,b) => b.sleepScore - a.sleepScore)[0] : null
 
   // Activity Breakdown values
+  const breakdownSleep = Math.round(current30.reduce((s, d) => s + (d.sleepHours || 0) * 60, 0))
   const breakdownWalking = Math.round(current30.reduce((s, d) => s + d.steps * 0.008, 0))
   const breakdownOtherCardio = Math.round(current30.reduce((s, d) => s + d.activeMins * 0.2, 0))
   const breakdownActiveZone = Math.round(totalAZ * 0.3)
   const breakdownOther = Math.round(current30.reduce((s, d) => s + d.activeMins * 0.1, 0))
-  const breakdownTotal = totalCyclingTimeCurrent + breakdownWalking + breakdownOtherCardio + breakdownActiveZone + breakdownOther
+  const breakdownTotal = totalCyclingTimeCurrent + breakdownWalking + breakdownOtherCardio + breakdownActiveZone + breakdownOther + breakdownSleep
   const breakdownTotalHours = Math.floor(breakdownTotal / 60)
   const breakdownTotalMins = breakdownTotal % 60
 
@@ -487,7 +488,7 @@ export default function App() {
   function Sparkline({ dataList, dataKey, color }: { dataList: any[], dataKey: string, color: string }) {
     return (
       <div className="h-[25px] w-full mt-1.5 opacity-80 hover:opacity-100 transition-opacity">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={25} minWidth={0}>
           <AreaChart data={dataList} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
             <defs>
               <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
@@ -778,7 +779,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <ResponsiveContainer width="100%" height={250} minWidth={0}>
                     <ComposedChart data={current30} margin={{ top: 10, right: -15, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
                       <XAxis dataKey="date" {...ax} />
@@ -805,7 +806,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <ResponsiveContainer width="100%" height={250} minWidth={0}>
                     <ComposedChart data={current30} margin={{ top: 10, right: -15, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
                       <XAxis dataKey="date" {...ax} />
@@ -865,7 +866,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[200px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={200} minWidth={0}>
                     <BarChart data={current30.map(d => {
                       const ride = currentCycling.find(c => c.date === d.dateStr);
                       return { date: d.date, duration: ride ? ride.duration : 0 };
@@ -893,10 +894,11 @@ export default function App() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center mt-4">
                   <div className="h-[180px] relative flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={180} minWidth={0}>
                       <PieChart>
                         <Pie
                           data={[
+                            { name: 'Sleep', value: breakdownSleep, color: '#6366f1' },
                             { name: 'Cycling', value: totalCyclingTimeCurrent, color: '#8b5cf6' },
                             { name: 'Walking', value: breakdownWalking, color: '#0ea5e9' },
                             { name: 'Other Cardio', value: breakdownOtherCardio, color: '#10b981' },
@@ -911,6 +913,7 @@ export default function App() {
                           dataKey="value"
                         >
                           {[
+                            { color: '#6366f1' },
                             { color: '#8b5cf6' },
                             { color: '#0ea5e9' },
                             { color: '#10b981' },
@@ -930,6 +933,7 @@ export default function App() {
                   </div>
                   <div className="space-y-2 text-xs">
                     {[
+                      { name: 'Sleep', mins: breakdownSleep, color: 'bg-indigo-500', text: 'text-indigo-400' },
                       { name: 'Cycling', mins: totalCyclingTimeCurrent, color: 'bg-violet-500', text: 'text-violet-400' },
                       { name: 'Walking', mins: breakdownWalking, color: 'bg-sky-500', text: 'text-sky-400' },
                       { name: 'Other Cardio', mins: breakdownOtherCardio, color: 'bg-emerald-500', text: 'text-emerald-400' },
@@ -1140,7 +1144,7 @@ export default function App() {
               <CardHeader><CardTitle>Daily Heart Rate Zones (Minutes)</CardTitle></CardHeader>
               <CardContent>
                 <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={280} minWidth={0}>
                     <BarChart data={data.activeZones.slice(-days)} margin={{ left: -20, right: 8, top: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="date" {...ax} /><YAxis {...ax} />
@@ -1195,7 +1199,7 @@ export default function App() {
               <CardHeader><CardTitle>Sleep Stage Breakdown</CardTitle></CardHeader>
               <CardContent>
                 <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={280} minWidth={0}>
                     <BarChart data={data.sleep.slice(-days)} margin={{ left: -20, right: 8, top: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="date" {...ax} /><YAxis {...ax} />
@@ -1266,7 +1270,7 @@ export default function App() {
 
                 {/* The EOV Chart */}
                 <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={280} minWidth={0}>
                     <AreaChart data={data.spo2.slice(-days)} margin={{ left: -20, right: 8, top: 10, bottom: 4 }}>
                       <defs>
                         <linearGradient id="eovColor" x1="0" y1="0" x2="0" y2="1">
@@ -1426,7 +1430,7 @@ export default function App() {
                   </CardHeader>
                   <CardContent className="pt-6 space-y-6">
                     <div className="h-[280px] w-full relative">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height={280} minWidth={0}>
                         <AreaChart data={chartData} margin={{ left: -25, right: 10, top: 10, bottom: 0 }}>
                           <defs>
                             <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
