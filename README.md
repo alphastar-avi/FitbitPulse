@@ -10,6 +10,8 @@ A Go application to frequently download and display Fitbit Charge 6 health data.
 
 <img width="1348" height="1017" alt="Screenshot 2026-05-10 at 10 47 22 PM" src="https://github.com/user-attachments/assets/f665b22d-55ba-430d-93f6-ccce77b7d54d" />
 
+<img width="1361" height="1014" alt="Screenshot 2026-07-05 at 11 35 13 PM" src="https://github.com/user-attachments/assets/7a74b035-bff9-4d2b-ab75-4c4855c179dc" />
+
 and more!
 
 ## Features
